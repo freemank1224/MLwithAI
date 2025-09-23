@@ -1,6 +1,9 @@
-pip install numpy
-pip install matplotlib
-pip install pandas
-pip install scikit-learn
-pip install xgboost
-pip install lightgbm
+numpy
+matplotlib
+pandas
+scikit-learn
+xgboost
+lightgbm
+
+jupyterlab
+jupyter-ai[all]
