@@ -71,15 +71,16 @@ def logistic_learning(X_train, y_train, states, losses, sigmoid):
 
 
 def logistic_threshold(model, X_test, y_test):
-    from sklearn.metrics import confusion_matrix
-
     def explore_threshold(threshold, ad_budget, event):
         grid = np.linspace(0, 10, 200)
         probabilities = model.predict_proba(np.column_stack([grid, np.full_like(grid, event)]))[:, 1]
         chosen = model.predict_proba([[ad_budget, event]])[0, 1]
         test_prob = model.predict_proba(X_test)[:, 1]
         predicted = (test_prob >= threshold).astype(int)
-        tn, fp, fn, tp = confusion_matrix(y_test, predicted, labels=[0, 1]).ravel()
+        tn = np.sum((y_test == 0) & (predicted == 0))
+        fp = np.sum((y_test == 0) & (predicted == 1))
+        fn = np.sum((y_test == 1) & (predicted == 0))
+        tp = np.sum((y_test == 1) & (predicted == 1))
         fig, (ax, matrix_ax) = plt.subplots(1, 2, figsize=(10, 4))
         ax.plot(grid, probabilities, color='#3c9b85', lw=3)
         ax.axhline(threshold, ls='--', color='#d55c55', label='Threshold')
@@ -198,7 +199,7 @@ def hierarchy_demo(X):
         if pair:
             a, b = (X[group].mean(axis=0) for group in pair)
             ax.plot([a[0], b[0]], [a[1], b[1]], '--', color='#d4533c', lw=2)
-        ax.set(title=f'{len(X)-step} clusters · merge {step}', xlabel='Color feature', ylabel='Size'); ax.grid(alpha=.2)
+        ax.set(title=f'{len(X)-step} clusters · merge {step}', xlabel='Size', ylabel='Sweetness'); ax.grid(alpha=.2)
         dendrogram(Z, ax=tree, color_threshold=0, above_threshold_color='#6c8190')
         if step: tree.axhline(Z[step-1, 2], color='#d4533c', linestyle='--', label='Current merge height'); tree.legend()
         tree.set(title=f'Dendrogram · {method}', xlabel='Fruit index', ylabel='Merge height')
@@ -226,7 +227,7 @@ def pca_projection(X2, mean2, centered2):
         for p, q in zip(X2[::4], reconstructed[::4]): ax.plot([p[0], q[0]], [p[1], q[1]], color='#98a6b0', lw=.7)
         line = mean2 + np.outer([-4, 4], direction)
         ax.plot(line[:, 0], line[:, 1], color='#e05b42', lw=2)
-        ax.set(xlim=(-2, 8), ylim=(-2, 6), xlabel='Feature 1', ylabel='Feature 2', title=f'Projection · error {mse:.2f}')
+        ax.set(xlim=(-2, 8), ylim=(-2, 6), xlabel='Fruit width', ylabel='Fruit height', title=f'Projection · error {mse:.2f}')
         ax.set_aspect('equal'); ax.legend(); ax.grid(alpha=.2)
         angles = np.arange(181)
         dirs = np.column_stack([np.cos(np.deg2rad(angles)), np.sin(np.deg2rad(angles))])
