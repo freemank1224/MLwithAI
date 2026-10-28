@@ -1,0 +1,5 @@
+# Local teaching environment and Jupyter-generated files
+.venv/
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]

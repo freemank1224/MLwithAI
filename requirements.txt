@@ -1,9 +1,7 @@
 numpy
+scipy
 matplotlib
-pandas
 scikit-learn
-xgboost
-lightgbm
-
+ipywidgets
+ipykernel
 jupyterlab
-jupyter-ai[all]
