@@ -1,6 +1,6 @@
 # MLwithAI：在实验中理解机器学习
 
-这是一套面向机器学习与编程初学者的 Jupyter Notebook 教学材料。每一课先用三格情景图提出一个具体问题，再做预测、观察交互图、编写代码并验证结果。课尾的「NumPy 手写实现」是选学内容，逐步拆解算法的关键计算；课程中的现成库主要用于对照。图中的数据是教学用模拟数据，结论不应直接用于真实决策。
+这是一套面向机器学习与编程初学者的 Jupyter Notebook 教学材料。每一课先用情景图或算法示意图提出一个具体问题，再做预测、观察交互图、编写代码并验证结果。课尾的「NumPy 手写实现」是选学内容，逐步拆解算法的关键计算；课程中的现成库主要用于对照。图中的数据是教学用模拟数据，结论不应直接用于真实决策。
 
 ## 安装与启动
 
@@ -27,14 +27,17 @@ python -m jupyterlab
 | 0 | [Python 基础练习](MachineLearning/Execises/BasicTest.ipynb) | 用变量、列表和函数处理一小组数据，为后续代码练习做准备 |
 | 1 | [线性回归](MachineLearning/LinearReg.ipynb) | 怎样用一条直线预测连续数值？梯度下降如何改进这条线？ |
 | 2 | [逻辑回归](MachineLearning/LogisticReg.ipynb) | 怎样估计二分类概率？调整决策阈值会改变什么？ |
-| 3 | [K-means 聚类](MachineLearning/Kmeans.ipynb) | 没有标签时，如何反复分配样本并更新中心？ |
-| 4 | [层次聚类](MachineLearning/CascadedClustering.ipynb) | 如何从单个样本开始逐步合并，并用树状图选择分组？ |
-| 5 | [主成分分析 PCA](MachineLearning/PCA.ipynb) | 怎样投影到较少维度，同时尽量保留数据的变化？ |
-| 6 | [Q-learning](RLsimple.ipynb) | 智能体如何通过奖励和探索在网格中学会行动？ |
+| 3 | [决策树、随机森林与梯度提升树](MachineLearning/DecisionTrees.ipynb) | 如何逐步划分数据？随机森林、梯度提升树与 XGBoost 如何联系，又有什么区别？ |
+| 4 | [K-means 聚类](MachineLearning/Kmeans.ipynb) | 没有标签时，如何反复分配样本并更新中心？ |
+| 5 | [层次聚类](MachineLearning/CascadedClustering.ipynb) | 如何从单个样本开始逐步合并，并用树状图选择分组？ |
+| 6 | [主成分分析 PCA](MachineLearning/PCA.ipynb) | 怎样投影到较少维度，同时尽量保留数据的变化？ |
+| 7 | [Q-learning](RLsimple.ipynb) | 智能体如何通过奖励和探索在网格中学会行动？ |
 
 每个笔记本都可以单独学习；线性回归和基础练习适合先学。课中请从上到下逐格运行，遇到问题先作预测、操作演示，再回到代码改变参数或补充实现，并运行紧接着的检查。标为「演示」或「准备」的代码直接运行即可，无需理解或修改 Widget；标为「练习」的代码才是需要关注的算法实现。检查通过只说明满足所给例子，还要观察图形并思考不同输入下的行为。
 
-演示控件的实现集中在 `MachineLearning/teaching_widgets.py`，情景插图位于 `assets/`，都是课程配套文件。请保留整个项目目录结构，不要只复制单个笔记本。修改练习代码后，按笔记本中的提示重新运行相应的训练、演示和检查单元。
+部分演示控件的实现位于 `MachineLearning/teaching_widgets.py`，情景插图位于 `assets/`，都是课程配套文件。请保留整个项目目录结构，不要只复制单个笔记本。修改练习代码后，按笔记本中的提示重新运行相应的训练、演示和检查单元。
+
+决策树课程在关键阶段安排了互动自测：运行题目单元，选择答案并提交后查看解释；可以修改答案再次提交。自测不影响后续代码。
 
 ## 使用交互图
 
