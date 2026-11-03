@@ -1,10 +1,14 @@
 # 课程插图与算法示意图
 
-决策树课程另有五张算法图：`tree_learning_map.png` 展示算法关系，`tree_split_mechanics.png` 展示划分的计算，`forest_vs_boosting.png` 比较组合方式，`gbdt_residuals.png` 展示残差更新，`xgboost_mechanics.png` 解释叶权和分裂增益。图中的数据是独立的教学示例。可在项目根目录运行 `python assets/generate_tree_diagrams.py` 重新生成；脚本需要系统中有中文字体。
+决策树课程使用 `watermelon_*.png` 的八张西瓜主题示意图，分别展示决策路径、分类划分、随机森林抽样、模型脉络、回归划分、两轮提升与 XGBoost 计算。图中的样本是教学用虚构数据。可在项目根目录运行 `python assets/generate_watermelon_diagrams.py` 重新生成；脚本需要系统中有中文字体。
+
+`watermelon_xgb_gradient.png` 和 `watermelon_xgb_gain.png` 进一步用平方损失曲线与四瓜算例解释梯度、叶权和分裂收益；运行 `python assets/generate_watermelon_xgb_intuition.py` 可重新生成。
+
+较早的 `tree_learning_map.png`、`tree_split_mechanics.png`、`forest_vs_boosting.png`、`gbdt_residuals.png` 与 `xgboost_mechanics.png` 仍保留在项目中，可运行 `python assets/generate_tree_diagrams.py` 重新生成。
 
 七张插图使用 Codex 内置 imagegen 生图工具分别生成。它们用于故事引入；精确的数据和计算由笔记本代码提供。
 
-`tree_decision_diagram.png` 是另外生成的决策树示意图，取代水果情景图作为课程引入。它展示条件判断、分支与预测叶节点，规则仅用于说明读图方式，不是模型训练结果。
+`tree_decision_diagram.png` 是旧版课程使用的决策树示意图，现保留作历史素材；规则仅用于说明读图方式，不是模型训练结果。
 
 生成提示词：使用简洁的教学流程图，根节点为“广告 ≥ 5？”，是则预测售罄，否则继续判断“有活动？”，是则预测售罄，否则预测未售罄；每个判断节点只有两条标记为“是”和“否”的箭头，不加入人物或装饰背景。使用 Codex 内置 imagegen 工具生成。
 

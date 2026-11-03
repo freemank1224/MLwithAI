@@ -27,7 +27,7 @@ python -m jupyterlab
 | 0 | [Python 基础练习](MachineLearning/Execises/BasicTest.ipynb) | 用变量、列表和函数处理一小组数据，为后续代码练习做准备 |
 | 1 | [线性回归](MachineLearning/LinearReg.ipynb) | 怎样用一条直线预测连续数值？梯度下降如何改进这条线？ |
 | 2 | [逻辑回归](MachineLearning/LogisticReg.ipynb) | 怎样估计二分类概率？调整决策阈值会改变什么？ |
-| 3 | [决策树、随机森林与梯度提升树](MachineLearning/DecisionTrees.ipynb) | 如何逐步划分数据？随机森林、梯度提升树与 XGBoost 如何联系，又有什么区别？ |
+| 3 | [决策树、随机森林与梯度提升树](MachineLearning/DecisionTrees.ipynb) | 从挑西瓜开始，理解树如何划分数据，以及随机森林、梯度提升树与 XGBoost 的联系和区别。 |
 | 4 | [K-means 聚类](MachineLearning/Kmeans.ipynb) | 没有标签时，如何反复分配样本并更新中心？ |
 | 5 | [层次聚类](MachineLearning/CascadedClustering.ipynb) | 如何从单个样本开始逐步合并，并用树状图选择分组？ |
 | 6 | [主成分分析 PCA](MachineLearning/PCA.ipynb) | 怎样投影到较少维度，同时尽量保留数据的变化？ |
@@ -38,6 +38,8 @@ python -m jupyterlab
 部分演示控件的实现位于 `MachineLearning/teaching_widgets.py`，情景插图位于 `assets/`，都是课程配套文件。请保留整个项目目录结构，不要只复制单个笔记本。修改练习代码后，按笔记本中的提示重新运行相应的训练、演示和检查单元。
 
 决策树课程在关键阶段安排了互动自测：运行题目单元，选择答案并提交后查看解释；可以修改答案再次提交。自测不影响后续代码。
+
+课程还提供三个可独立重置的互动实验：亲手选择问题建立决策树、抽样组合小森林、逐轮修正甜度预测。它们使用教学模拟数据，运行对应单元后即可操作；需要保留 `MachineLearning/watermelon_tree_lab.py` 和 `MachineLearning/watermelon_ensemble_labs.py`。
 
 ## 使用交互图
 
