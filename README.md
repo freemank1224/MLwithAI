@@ -39,7 +39,7 @@ python -m jupyterlab
 
 决策树课程在关键阶段安排了互动自测：运行题目单元，选择答案并提交后查看解释；可以修改答案再次提交。自测不影响后续代码。
 
-课程还提供三个可独立重置的互动实验：亲手选择问题建立决策树、抽样组合小森林、逐轮修正甜度预测。它们使用教学模拟数据，运行对应单元后即可操作；需要保留 `MachineLearning/watermelon_tree_lab.py` 和 `MachineLearning/watermelon_ensemble_labs.py`。
+课程还提供三个可独立重置的图形互动实验：亲手选择问题建立决策树、抽样组合小森林、逐轮修正甜度预测。图形会随分裂、抽样和预测实时更新。它们使用教学模拟数据，运行对应单元后即可操作；需要保留 `MachineLearning/watermelon_tree_lab.py` 和 `MachineLearning/watermelon_ensemble_labs.py`。
 
 ## 使用交互图
 

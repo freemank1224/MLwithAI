@@ -77,6 +77,29 @@ class TreeLabTest(unittest.TestCase):
         self.assertFalse(node.disabled)
         self.assertIn('待处理节点还剩 1 个', message.value)
 
+    def test_graphs_follow_preview_selection_and_new_melon(self):
+        root = watermelon_tree_lab()
+        _, _, node, question, preview, buttons, _, tree_view, node_buttons, _, sample, _ = root.children
+        split, _, reset = buttons.children
+        self.assertIn('data-role="split-preview"', preview.value)
+        self.assertIn('data-yes="A、B、C、D"', preview.value)
+        self.assertIn('data-no="E、F"', preview.value)
+        before = tree_view.value
+        question.value = 'color'
+        self.assertIn('data-yes="A、B、C"', preview.value)
+        self.assertIn('data-no="D、E、F"', preview.value)
+        self.assertEqual(tree_view.value, before)  # a preview does not split the tree
+        question.value = 'texture'
+        split.click()
+        self.assertIn('data-node="root/yes"', tree_view.value)
+        self.assertIn('data-node="root/no"', tree_view.value)
+        node_buttons.children[1].children[1].click()  # choose the E/F branch
+        self.assertEqual(node.value, (False,))
+        sample.children[1].value = '模糊'
+        self.assertIn('data-node="root/no" data-selected="true" data-route="true"', tree_view.value)
+        reset.click()
+        self.assertNotIn('data-node="root/no"', tree_view.value)
+
 
 class ForestLabTest(unittest.TestCase):
     def test_repeated_sampling_and_probability_aggregation(self):
@@ -106,6 +129,19 @@ class ForestLabTest(unittest.TestCase):
         reset.click()
         self.assertIn('还没有树', result.value)
 
+    def test_graph_reflects_actual_draws_and_aggregate(self):
+        root = forest_lab()
+        _, draws, _, buttons, _, result = root.children
+        add, reset = buttons.children
+        self.assertIn('<svg', result.value)
+        for selector, value in zip(draws.children, 'AABC'):
+            selector.value = value
+        add.click()
+        self.assertIn('好瓜概率 0.750', result.value)
+        self.assertIn('合并：(0.750) ÷ 1 = 0.750', result.value)
+        reset.click()
+        self.assertNotIn('好瓜概率 0.750', result.value)
+
 
 class BoostingLabTest(unittest.TestCase):
     def test_two_rounds_use_updated_residuals(self):
@@ -132,6 +168,23 @@ class BoostingLabTest(unittest.TestCase):
         reset.click()
         self.assertIn('8，8，8', current.value)
         self.assertIn('还没有添加树', history.value)
+
+    def test_graph_tracks_each_round_and_reset(self):
+        root = boosting_lab()
+        _, current, _, threshold, _, buttons, _, _ = root.children
+        add, reset = buttons.children
+        self.assertIn('<svg', current.value)
+        self.assertIn('第 0 轮', current.value)
+        add.click()
+        threshold.value = .65
+        add.click()
+        self.assertIn('第 2 轮', current.value)
+        self.assertIn('6.625', current.value)
+        self.assertIn('8.125', current.value)
+        self.assertIn('9.25', current.value)
+        reset.click()
+        self.assertIn('第 0 轮', current.value)
+        self.assertNotIn('6.625', current.value)
 
 
 if __name__ == '__main__':

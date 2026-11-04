@@ -159,16 +159,193 @@ def _tree_html(node, selected=None, path=()):
             f'<ul><li>是<ul>{yes}</ul></li><li>否<ul>{no}</ul></li></ul></li>')
 
 
+def _melon(x, y, index, size=34):
+    """Draw one labeled sample. Flesh color is a label, not its skin color."""
+    name, _, _, _, good = MELONS[index]
+    flesh = '#eb8078' if good else '#9ca9ae'
+    mark = '好' if good else '坏'
+    return (f'<g transform="translate({x},{y})">'
+            f'<circle cx="{size/2}" cy="{size/2}" r="{size/2}" fill="#2d8065"/>'
+            f'<circle cx="{size/2}" cy="{size/2}" r="{size*.43}" fill="#e9f4df"/>'
+            f'<circle cx="{size/2}" cy="{size/2}" r="{size*.39}" fill="{flesh}"/>'
+            f'<circle cx="{size*.30}" cy="{size*.32}" r="1.1" fill="#495e54"/>'
+            f'<circle cx="{size*.70}" cy="{size*.32}" r="1.1" fill="#495e54"/>'
+            f'<circle cx="{size*.30}" cy="{size*.70}" r="1.1" fill="#495e54"/>'
+            f'<circle cx="{size*.70}" cy="{size*.70}" r="1.1" fill="#495e54"/>'
+            f'<text x="{size/2}" y="{size*.66}" text-anchor="middle" '
+            f'font-size="{size*.45}" font-weight="bold" fill="#fff">{escape(name)}</text>'
+            f'<text x="{size/2}" y="{size+15}" text-anchor="middle" '
+            f'font-size="13" fill="#243c42">{mark}</text></g>')
+
+
+def _wrap_svg(svg, min_width=600):
+    """Keep dense diagrams legible on a narrow notebook; allow horizontal scroll."""
+    return (f'<div style="width:100%;max-width:100%;overflow-x:auto;">'
+            f'<div style="min-width:{min_width}px;">{svg}</div></div>'
+            '<small style="color:#49655d">图较宽时，可在图内左右滑动查看。</small>')
+
+
+def _split_svg(node, yes, no, score, question):
+    """Preview only; this figure must not change the saved tree."""
+    width, height = 760, 335
+    font = 'font-family="system-ui, sans-serif"'
+    label, wanted, _ = FEATURES[question]
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+             f'data-role="split-preview" data-yes="{escape(_ids(yes))}" data-no="{escape(_ids(no))}" '
+             f'role="img" aria-label="候选问题的分组预览，尚未加入决策树" '
+             f'style="display:block;width:100%;height:auto" {font}>',
+             '<rect x="2" y="2" width="756" height="331" rx="16" fill="#f7faf8" stroke="#d1e3dc"/>',
+             '<text x="380" y="28" text-anchor="middle" font-size="16" font-weight="bold" fill="#20433b">① 当前节点的训练瓜</text>']
+    start = (width - len(node.indices) * 55) / 2
+    for j, index in enumerate(node.indices):
+        parts.append(_melon(start + j * 55, 42, index, 32))
+    parts += [f'<text x="380" y="120" text-anchor="middle" font-size="15" fill="#294b45">'
+              f'预览问题：{escape(label)}是{escape(wanted)}吗？</text>',
+              '<path d="M380 130 L195 168 M380 130 L565 168" fill="none" stroke="#829c93" stroke-width="2"/>']
+    for x, values, answer, color in ((20, yes, '是', '#2a846e'), (395, no, '否', '#bf665b')):
+        parts.append(f'<rect x="{x}" y="168" width="345" height="136" rx="12" fill="#fff" stroke="{color}" stroke-width="2"/>')
+        parts.append(f'<text x="{x+16}" y="192" font-size="16" font-weight="bold" fill="{color}">回答「{answer}」</text>')
+        if values:
+            first = x + (345 - len(values) * 49) / 2
+            for j, index in enumerate(values):
+                parts.append(_melon(first + j * 49, 202, index, 30))
+            parts.append(f'<text x="{x+172}" y="287" text-anchor="middle" font-size="14" fill="#28433d">'
+                         f'{escape(_counts(values))} · 基尼 {gini(values):.3f}</text>')
+        else:
+            parts.append(f'<text x="{x+172}" y="250" text-anchor="middle" font-size="15" fill="#7a5147">这一边没有瓜</text>')
+    footer = '两边都需要有瓜，才能用这个问题分裂' if score is None else f'两组加权基尼：{score:.3f}'
+    parts += [f'<text x="380" y="325" text-anchor="middle" font-size="14" fill="#32534a">{footer}</text>', '</svg>']
+    return _wrap_svg(''.join(parts), min_width=600)
+
+
+def _tree_svg(tree, selected, sample_path):
+    """Draw the committed tree, using actual nodes and the current prediction path."""
+    positions, nodes, leaves = {}, {}, []
+
+    def collect(node, path=(), depth=0):
+        nodes[path] = (node, depth)
+        if node.feature is None:
+            leaves.append(path)
+        else:
+            collect(node.children[True], path + (True,), depth + 1)
+            collect(node.children[False], path + (False,), depth + 1)
+
+    collect(tree.root)
+    width = max(640, len(leaves) * 185)
+    height = 90 + max(d for _, d in nodes.values()) * 158 + 115
+    for i, path in enumerate(leaves):
+        positions[path] = width * (i + .5) / len(leaves)
+
+    def center(node, path=()):
+        if node.feature is None:
+            return positions[path]
+        left = center(node.children[True], path + (True,))
+        right = center(node.children[False], path + (False,))
+        positions[path] = (left + right) / 2
+        return positions[path]
+
+    center(tree.root)
+    route = {sample_path[:i] for i in range(len(sample_path) + 1)}
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+             f'data-role="committed-tree" '
+             f'role="img" aria-label="已建立的决策树，描边标出当前节点和新瓜路径" '
+             f'style="display:block;width:100%;height:auto" font-family="system-ui, sans-serif">',
+             f'<rect x="2" y="2" width="{width-4}" height="{height-4}" rx="16" fill="#f7faf8" stroke="#d1e3dc"/>']
+    for path, (node, depth) in nodes.items():
+        if node.feature is None:
+            continue
+        x, y = positions[path], 42 + depth * 158
+        for answer in (True, False):
+            child = path + (answer,)
+            tx, ty = positions[child], y + 158
+            active = child in route
+            stroke = '#d39528' if active else '#9cafaa'
+            line_width = 5 if active else 2
+            parts.append(f'<path d="M{x:.1f} {y+102} L{tx:.1f} {ty}" fill="none" stroke="{stroke}" stroke-width="{line_width}"/>')
+            parts.append(f'<text x="{(x+tx)/2:.1f}" y="{y+132}" text-anchor="middle" '
+                         f'font-size="14" font-weight="bold" fill="#35554c">{"是" if answer else "否"}</text>')
+    for path, (node, depth) in nodes.items():
+        x, y = positions[path] - 79, 42 + depth * 158
+        active, current = path in route, path == selected and not node.closed
+        path_code = 'root' + ''.join('/yes' if answer else '/no' for answer in path)
+        parts.append(f'<g data-node="{path_code}" data-selected="{str(current).lower()}" '
+                     f'data-route="{str(active).lower()}" data-samples="{escape(_ids(node.indices))}">')
+        outline = '#d39528' if active else '#b5cbc2'
+        fill = '#e7f5f0' if current else '#fff'
+        parts.append(f'<rect x="{x:.1f}" y="{y}" width="158" height="102" rx="12" '
+                     f'fill="{fill}" stroke="{outline}" stroke-width="{4 if active else 2}"/>')
+        if current:
+            parts.append(f'<rect x="{x+5:.1f}" y="{y+5}" width="148" height="92" rx="9" fill="none" stroke="#197c83" stroke-width="2" stroke-dasharray="4 3"/>')
+        if node.feature is not None:
+            name, wanted, _ = FEATURES[node.feature]
+            label = f'{name}是{wanted}？'
+            status = '问题节点'
+        else:
+            label = '已定叶子' if node.closed else '待处理 · 暂定'
+            good = sum(MELONS[i][4] for i in node.indices)
+            status = '好坏平票' if good*2 == len(node.indices) else ('预测好瓜' if good*2 > len(node.indices) else '预测坏瓜')
+        parts.append(f'<text x="{x+79:.1f}" y="{y+24}" text-anchor="middle" font-size="15" font-weight="bold" fill="#22453d">{escape(label)}</text>')
+        parts.append(f'<text x="{x+79:.1f}" y="{y+46}" text-anchor="middle" font-size="13" fill="#4d6962">{escape(status)}</text>')
+        start = x + (158 - len(node.indices) * 23) / 2
+        for j, idx in enumerate(node.indices):
+            mark = '好' if MELONS[idx][4] else '坏'
+            fill_chip = '#f4beb7' if MELONS[idx][4] else '#c6d0d3'
+            cx = start + j * 23 + 10
+            shape = (f'<circle cx="{cx:.1f}" cy="{y+69}" r="9" fill="{fill_chip}" stroke="#56816d"/>'
+                     if MELONS[idx][4] else
+                     f'<rect x="{cx-9:.1f}" y="{y+60}" width="18" height="18" rx="2" fill="{fill_chip}" stroke="#56816d"/>')
+            parts.append(shape + f'<text x="{cx:.1f}" y="{y+73}" text-anchor="middle" font-size="10" fill="#243c42">{escape(MELONS[idx][0])}</text>'
+                         f'<title>{escape(MELONS[idx][0])}：{mark}瓜</title>')
+        if current:
+            parts.append(f'<text x="{x+79:.1f}" y="{y+95}" text-anchor="middle" font-size="12" font-weight="bold" fill="#126b73">当前节点</text>')
+        parts.append('</g>')
+    parts.append('</svg>')
+    return _wrap_svg(''.join(parts), min_width=min(width, 680))
+
+
+def _prediction_svg(tree, sample):
+    """Small horizontal route repeated beside the new-melon controls."""
+    trace, good, total, closed = tree.predict(sample)
+    width = max(620, 170 * (len(trace) + 2))
+    result = '好坏平票' if good * 2 == total else ('预测好瓜' if good * 2 > total else '预测坏瓜')
+    status = '已定叶子' if closed else '暂定结果'
+    box_width = width / (len(trace) + 2)
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} 118" '
+             f'data-role="prediction-route" '
+             f'role="img" aria-label="新瓜沿已建立的树经过的问题与当前结果" '
+             f'style="display:block;width:100%;height:auto" font-family="system-ui, sans-serif">']
+    labels = [('新瓜', f'{sample["color"]} · {sample["texture"]} · {sample["stem"]}')]
+    labels += [(f'{FEATURES[feature][0]}是{FEATURES[feature][1]}？', '是' if answer else '否')
+               for feature, answer in trace]
+    labels.append((result, f'{status} · 好瓜 {good}/{total}'))
+    for i, (top, bottom) in enumerate(labels):
+        x = i * box_width + 5
+        if i:
+            parts.append(f'<path d="M{x-18:.1f} 57 L{x-3:.1f} 57 '
+                         f'M{x-9:.1f} 52 L{x-3:.1f} 57 L{x-9:.1f} 62" '
+                         'fill="none" stroke="#c58c25" stroke-width="3"/>')
+        fill = '#fff3cd' if i == len(labels)-1 else '#fff'
+        parts.append(f'<rect x="{x:.1f}" y="18" width="{box_width-24:.1f}" height="76" rx="12" fill="{fill}" stroke="#d6a742" stroke-width="2"/>')
+        parts.append(f'<text x="{x+(box_width-24)/2:.1f}" y="47" text-anchor="middle" font-size="14" fill="#26443c">{escape(top)}</text>')
+        parts.append(f'<text x="{x+(box_width-24)/2:.1f}" y="73" text-anchor="middle" font-size="13" font-weight="bold" fill="#76521a">{escape(bottom)}</text>')
+    parts.append('</svg>')
+    return _wrap_svg(''.join(parts), min_width=min(width, 620))
+
+
 def watermelon_tree_lab():
     """返回可显示的互动面板：选择节点和问题，分裂、定叶或重置。"""
     tree = ManualTree()
-    title = widgets.HTML('<h3>亲手种一棵西瓜决策树</h3>'
+    title = widgets.HTML('<style>.watermelon-tree-lab .widget-html-content '
+                         '{min-width:0;max-width:100%;width:100%;}</style>'
+                         '<h3>亲手种一棵西瓜决策树</h3>'
                          '<p>先选一个待处理节点，再比较问题。选一个问题分裂；'
                          '也可以停止并把当前组定为叶子。完成后会按树图先“是”后“否”的顺序自动选择下一个待处理节点；'
                          '也可以用“当前节点”菜单自己切换。数据是教学模拟，不是挑瓜规则。</p>')
     rows = ''.join('<tr>' + ''.join(f'<td style="padding:2px 8px">{escape(str(x))}</td>' for x in (m[0], m[1], m[2], m[3], '好' if m[4] else '坏')) + '</tr>' for m in MELONS)
-    table = widgets.HTML('<p><b>训练瓜</b>（瓜蒂为本实验补充的特征）</p>'
-                         '<table><thead><tr><th>编号</th><th>色泽</th><th>纹理</th><th>瓜蒂</th><th>已知好坏</th></tr></thead><tbody>' + rows + '</tbody></table>')
+    table = widgets.HTML('<p><b>训练瓜 A–F</b>：瓜蒂是本实验补充的模拟特征。'
+                         '图中瓜瓤颜色和“好/坏”表示已知标签，<b>不是外皮色泽</b>。</p>'
+                         '<details><summary>查看六个瓜的完整特征表</summary>'
+                         '<table><thead><tr><th>编号</th><th>色泽</th><th>纹理</th><th>瓜蒂</th><th>已知好坏</th></tr></thead><tbody>' + rows + '</tbody></table></details>')
     node_select = widgets.Dropdown(description='当前节点', layout=widgets.Layout(width='95%'))
     question = widgets.Dropdown(options=[(f'{v[0]}是{v[1]}吗？', k) for k, v in FEATURES.items()],
                                 value='texture', description='候选问题', layout=widgets.Layout(width='95%'))
@@ -182,16 +359,43 @@ def watermelon_tree_lab():
     new_texture = widgets.Dropdown(options=['清晰', '模糊'], description='纹理')
     new_stem = widgets.Dropdown(options=['蜷缩', '硬挺'], description='瓜蒂')
     new_output = widgets.HTML()
+    node_buttons = widgets.VBox()
+
+    def refresh_node_buttons():
+        """Offer direct, keyboard-accessible actions next to the drawn tree."""
+        choices = []
+        for path in tree.pending():
+            is_current = path == node_select.value
+            ids = _ids(tree.node(path).indices)
+            button = widgets.Button(
+                description=f'{"当前" if is_current else "选择"}：{ids}',
+                tooltip=_path_name(tree, path),
+                button_style='info' if is_current else '',
+                layout=widgets.Layout(width='auto', min_width='120px'))
+            button.on_click(lambda _, p=path: setattr(node_select, 'value', p))
+            choices.append(button)
+        hint = ('<b>选择树中要继续处理的节点：</b>按钮中的字母是该节点的瓜。'
+                if choices else '所有节点已处理完成。')
+        node_buttons.children = (widgets.HTML(hint),
+                                 widgets.HBox(choices, layout=widgets.Layout(flex_flow='row wrap')))
 
     def update_prediction():
         sample = {'color': new_color.value, 'texture': new_texture.value, 'stem': new_stem.value}
         trace, good, total, done = tree.predict(sample)
+        route = tuple(answer for _, answer in trace)
         path = ' → '.join(f'{FEATURES[f][0]}是{FEATURES[f][1]}：{"是" if a else "否"}' for f, a in trace)
         status = '叶子已确定' if done else '当前节点尚未定为叶子，预测只是暂时的'
         result = ('好坏平票，无法仅凭多数票确定' if good * 2 == total else
                   '预测好瓜' if good * 2 > total else '预测坏瓜')
-        new_output.value = (f'<b>新瓜走的路：</b>{escape(path or "尚未提问")}'
+        new_output.value = (_prediction_svg(tree, sample)
+                            + f'<b>新瓜走的路：</b>{escape(path or "尚未提问")}'
                             f'<br>{status}；该组好瓜 {good}/{total}，{result}。')
+        tree_view.value = ('<h4>② 已建立的树</h4>'
+                           '<p>青色虚线：当前节点；金色边框和连线：新瓜的路径。'
+                           '粉色圆形为好瓜，灰色方形为坏瓜；图形里的字母对应一颗训练瓜。</p>'
+                           + _tree_svg(tree, node_select.value, route)
+                           + '<details><summary>查看树的文字说明</summary><ul>'
+                           + _tree_html(tree.root, node_select.value) + '</ul></details>')
 
     def update_preview(*_):
         path = node_select.value
@@ -210,7 +414,9 @@ def watermelon_tree_lab():
         else:
             score_text = (f'加权基尼 = {len(yes)}/{len(node.indices)} × {gini(yes):.3f}'
                           f' + {len(no)}/{len(node.indices)} × {gini(no):.3f} = <b>{score:.3f}</b>')
-        preview.value = (f'<p><b>当前节点：</b>{escape(_path_name(tree, path))}。'
+        preview.value = ('<h4>① 候选划分预览（尚未加入树）</h4>'
+                         + _split_svg(node, yes, no, score, question.value)
+                         + f'<p><b>当前节点：</b>{escape(_path_name(tree, path))}。'
                          f'<br>待处理节点还剩 {len(tree.pending())} 个；当前有瓜 {escape(_ids(node.indices))}，'
                          f'{_counts(node.indices)}，基尼 {gini(node.indices):.3f}。'
                          f'<br>回答「是」：{escape(_ids(yes))}，{_counts(yes)}；'
@@ -223,7 +429,7 @@ def watermelon_tree_lab():
         if path is not None:
             message.value = (f'<p>已手动切换到【{escape(_path_name(tree, path))}】；'
                              f'还有 {len(tree.pending())} 个待处理节点。</p>')
-        tree_view.value = '<h4>你建出的树</h4><ul>' + _tree_html(tree.root, path) + '</ul>'
+        refresh_node_buttons()
         update_preview()
 
     def refresh():
@@ -241,7 +447,7 @@ def watermelon_tree_lab():
             node_select.disabled = not paths
         finally:
             node_select.observe(on_node_selected, names='value')
-        tree_view.value = '<h4>你建出的树</h4><ul>' + _tree_html(tree.root, node_select.value) + '</ul>'
+        refresh_node_buttons()
         update_preview()
 
     def next_step():
@@ -289,7 +495,11 @@ def watermelon_tree_lab():
     for control in (new_color, new_texture, new_stem):
         control.observe(lambda change: update_prediction(), names='value')
     refresh()
-    return widgets.VBox([title, table, node_select, question, preview,
-                         widgets.HBox([split, finish, reset]), message, tree_view,
+    root = widgets.VBox([title, table, node_select, question, preview,
+                         widgets.HBox([split, finish, reset], layout=widgets.Layout(flex_flow='row wrap')),
+                         message, tree_view, node_buttons,
                          widgets.HTML('<h4>让一颗新瓜走走看</h4><p>改变特征，观察它经过的问题和到达的叶子。</p>'),
-                         widgets.HBox([new_color, new_texture, new_stem]), new_output])
+                         widgets.HBox([new_color, new_texture, new_stem], layout=widgets.Layout(flex_flow='row wrap')),
+                         new_output])
+    root.add_class('watermelon-tree-lab')
+    return root
