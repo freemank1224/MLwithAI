@@ -18,6 +18,7 @@ Win11 有 NVIDIA 显卡的同学和负责配置环境的 AI Agent，请从[全�
 $ErrorActionPreference = 'Stop'
 $venvPath = '.venv'
 $kernelName = 'mlwithai-win11-cuda'
+$kernelDisplayName = 'Python (MLwithAI Win11 CUDA)'
 
 if ($env:CONDA_PREFIX) { throw 'Exit the Conda environment before continuing.' }
 if (!(Test-Path 'requirements.txt') -or !(Test-Path 'MachineLearning\CNNImageRecognition.ipynb')) {
@@ -62,7 +63,8 @@ function Invoke-CoursePython {
 Invoke-CoursePython -m pip --isolated install --index-url "https://download.pytorch.org/whl/$cudaBuild" "torch==2.5.1+${cudaBuild}"
 Invoke-CoursePython -m pip --isolated install --index-url https://pypi.org/simple '--only-binary=numpy,scipy,matplotlib' -r requirements.txt
 Invoke-CoursePython -m pip check
-Invoke-CoursePython -m ipykernel install --user --name $kernelName --display-name "Python (MLwithAI Win11 CUDA)"
+Invoke-CoursePython -c "import sys; from jupyter_client.kernelspec import KernelSpecManager; assert sys.argv[1].lower() not in KernelSpecManager().find_kernel_specs(), 'Kernel name already exists. Choose a new kernel name.'" $kernelName
+Invoke-CoursePython -m ipykernel install --user --name $kernelName --display-name $kernelDisplayName
 ```
 
 第二段通过刚注册的内核执行整本 CNN notebook，包含第一次样本绘图和 GPU 训练。终端需要输出课程解释器路径、CUDA 版 PyTorch、显卡名称、`cuda:0` 和样本图检查结果。AI Agent 可直接在终端验收，执行结果保存在内存中。
@@ -107,7 +109,7 @@ print("CNN notebook completed. First sample plot rendered.")
 if ($LASTEXITCODE -ne 0) { throw 'CNN notebook validation failed. Check the error above.' }
 ```
 
-开始上课时，在同一窗口运行 `& $coursePython -I -m jupyterlab`，打开 notebook 后选择 **Python (MLwithAI Win11 CUDA)**。以后可在项目根目录运行 `& .\.venv\Scripts\python.exe -I -m jupyterlab`。如使用其他虚拟环境路径，请用那个环境的解释器启动。
+开始上课时，在同一窗口运行 `& $coursePython -I -m jupyterlab`，打开 notebook 后选择 `$kernelDisplayName` 指定的内核，默认是 **Python (MLwithAI Win11 CUDA)**。以后可在项目根目录运行 `& .\.venv\Scripts\python.exe -I -m jupyterlab`。如使用其他虚拟环境路径，请用那个环境的解释器启动。
 
 如果验收时报 `CUDA training is unavailable` 或 `no kernel image is available`，保留显卡型号、驱动版本和完整错误，检查这块显卡是否受所用构建支持。需要先上课时，可用下文的 CPU 路线另建环境。
 
@@ -115,8 +117,17 @@ if ($LASTEXITCODE -ne 0) { throw 'CNN notebook validation failed. Check the erro
 
 1. 在报错的 notebook 中重启内核，先单独运行 `import sys; print(sys.executable)`，记录实际解释器路径。从终端用该解释器启动 JupyterLab（`& '实际的 python.exe 路径' -m jupyterlab --debug`），重新运行到出错单元，查看终端里的原始错误和出错位置。
 2. 如果日志同时出现 `OMP: Error #15` 和 `libiomp5md.dll` 或 `libomp.dll`，说明同一进程加载了冲突的 OpenMP 运行库。常见情形是 Conda 环境中已有使用 MKL 的包，随后又通过 pip 安装了自带 OpenMP 运行库的 PyTorch。CNN 的首张样本图使用 CPU 数据。如果日志只显示 `Kernel died`，请保留退出前的日志和具体单元，继续定位原因。[PyTorch 的 Windows 同类案例](https://github.com/pytorch/pytorch/issues/167979)
-3. 若已装好干净的课程环境，先切换到它注册的内核再验证。否则关闭旧 JupyterLab，从普通 PowerShell 按上方全新环境流程重建并验证。若项目已有 `.venv`，把第一段的 `$venvPath` 改为一个尚未使用的路径，例如 `Join-Path $env:LOCALAPPDATA 'MLwithAI\win11-cuda'`，保留原环境。打开课程时选 **Python (MLwithAI Win11 CUDA)**，用 `sys.executable` 确认已切换。
+3. 若已有通过验证的干净课程内核，可以直接切换过去。否则保存 notebook，关闭旧 JupyterLab，从普通 PowerShell 按上方全新环境流程配置。将第一段开头的环境路径和内核名称替换为以下示例，确保目录和内核名尚未被占用。再运行第二段验收，打开原项目中的同一个 notebook，选择 **Python (MLwithAI Win11 CUDA Recovery)**。
+
+   ```powershell
+   $venvPath = Join-Path $env:LOCALAPPDATA 'MLwithAI\win11-cuda-recovery'
+   $kernelName = 'mlwithai-win11-cuda-recovery'
+   $kernelDisplayName = 'Python (MLwithAI Win11 CUDA Recovery)'
+   ```
+
 4. 统一从官方 PyTorch 源安装 torch，其余依赖从 PyPI 安装。保留各软件包原有的 DLL。若旧环境设置过 `KMP_DUPLICATE_LIB_OK=TRUE`，可照安装命令清除当前进程的设置，再验收新内核。允许重复加载可能造成崩溃或计算错误。[Intel OpenMP 重复加载说明](https://community.intel.com/t5/Intel-oneAPI-Math-Kernel-Library/Windows-libiomp5md-reports-multiple-initialisation/m-p/1361874)
+
+课程只切换运行内核，原来的项目目录、数据和 notebook 仍在原处。旧环境及其内核可以继续留给其他项目。若它仅用于本课程，可在新内核验收通过后，确认没有其他项目使用它，再决定是否清理。
 
 ### 创建课程环境
 
