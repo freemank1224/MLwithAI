@@ -25,3 +25,9 @@
 - `hierarchy_scene.png`：A fruit shop owner organizing a small pile of apples, oranges and bananas. Three sequential storyboard panels: each fruit is separate; two similar fruits are placed together; small groups sit on shelves while the owner considers whether to combine them. No algorithmic dendrogram.
 - `pca_scene.png`：A traveler sends a picture over a slow connection. Three sequential storyboard panels: traveler sees a clear handwritten digit on a small screen; the tiny image is squeezed into a compact package; a friend receives a simplified, slightly blurry version of the digit. Clearly show original, compression, reconstruction without text.
 - `qlearning_scene.png`：A cheerful small delivery robot in a simple square warehouse. Three sequential storyboard panels: robot at a start square looks toward a parcel destination across shelves; robot tries a blocked way and stops; robot tries a different route around shelves toward the destination. Simple top-down grid, consistent robot and warehouse.
+
+深度学习专题的 `cnn_examples.png` 使用 MNIST 和 Sign Language MNIST 训练子集中的六张原图，放大并加上课堂观察提示。MNIST 图像署名 Yann LeCun、Corinna Cortes，图版沿用 [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/)。手势照片由 tecperson 发布，使用 CC0。[数据来源与抽样说明](../MachineLearning/data/image_recognition/README.md)
+
+`cnn_window.png` 中的 4 × 5 输入为教学构造，橙框把一个 2 × 2 输入窗口与其特征图上的对应数值联系起来。
+
+第二课的 `augmentation_views.png` 用同一张手势训练图演示位移、曝光变化与指尖移出画面。第三课的 `transfer_routes.png` 用数字训练图和结构图标出迁移时的卷积权重及新分类头。数字图版沿用 [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/)（MNIST © Yann LeCun、Corinna Cortes），手势图来自 tecperson 发布的 CC0 数据。[数据来源](../MachineLearning/data/image_recognition/README.md)

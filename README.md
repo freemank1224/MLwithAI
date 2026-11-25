@@ -1,6 +1,6 @@
 # MLwithAI：在实验中理解机器学习
 
-这是一套面向机器学习与编程初学者的 Jupyter Notebook 教学材料。每一课先用情景图或算法示意图提出一个具体问题，再做预测、观察交互图、编写代码并验证结果。课尾的「NumPy 手写实现」是选学内容，逐步拆解算法的关键计算；课程中的现成库主要用于对照。图中的数据是教学用模拟数据，结论不应直接用于真实决策。
+这是一套面向机器学习与编程初学者的 Jupyter Notebook 教学材料。每一课先用情景图或算法示意图提出一个具体问题，再做预测、观察交互图、编写代码并验证结果。课尾的「NumPy 手写实现」是选学内容，逐步拆解算法的关键计算；课程中的现成库主要用于对照。基础课多使用教学模拟数据，深度学习专题使用注明来源的真实图像子集。
 
 ## 安装与启动
 
@@ -20,6 +20,10 @@ python -m jupyterlab
 
 本课程不依赖联网服务或 API 密钥。原项目可选的 Jupyter AI、XGBoost、LightGBM 和 pandas 不属于运行这些课程的基础依赖；有需要时可在同一环境另行安装，例如 `python -m pip install 'jupyter-ai[all]' xgboost lightgbm pandas`。
 
+深度学习三课另需 PyTorch。CPU 环境可运行 `python -m pip install torch`。使用 NVIDIA 显卡时，请在同一 Python 环境安装与驱动兼容的 CUDA 版 PyTorch。准备单元会显示实际训练设备和显卡名称；当 `torch.cuda.is_available()` 为真时自动使用 CUDA，否则使用 CPU。三课均使用本地数据，可离线训练。[PyTorch 安装选择器](https://pytorch.org/get-started/locally/)
+
+三课训练时每轮刷新训练集和验证集的交叉熵（loss）曲线。训练损失按该轮实际送入模型的样本求平均。课程最后用各轮权重回算原始测试集的损失，将训练和测试 loss 分图展示，共用纵轴刻度。模型选择依据验证集，测试曲线用于最终复盘。
+
 ## 推荐学习顺序
 
 | 顺序 | 主题 | 要解决的问题 |
@@ -32,6 +36,14 @@ python -m jupyterlab
 | 5 | [层次聚类](MachineLearning/CascadedClustering.ipynb) | 如何从单个样本开始逐步合并，并用树状图选择分组？ |
 | 6 | [主成分分析 PCA](MachineLearning/PCA.ipynb) | 怎样投影到较少维度，同时尽量保留数据的变化？ |
 | 7 | [Q-learning](RLsimple.ipynb) | 智能体如何通过奖励和探索在网格中学会行动？ |
+
+### 深度学习系列专题
+
+| 任务 | 实验与交付 |
+| --- | --- |
+| 01 · [构建简单 CNN 进行图像识别](MachineLearning/CNNImageRecognition.ipynb) | 建议先学逻辑回归。从像素和滑窗乘加出发，分别在 MNIST 手写数字和 Sign Language MNIST 静态手势字母上训练 FCN 与 CNN。用四组测试成绩、参数量和具体错例解释自己的模型选择。 |
+| 02 · [图像增强：从一张照片生成训练视图](MachineLearning/ImageAugmentation.ipynb) | 调整旋转、平移和亮度，检查手势标签是否仍成立。在相同预算下训练三组 CNN，用原图与固定扰动的成绩为一个拍摄场景选择配方。 |
+| 03 · [迁移学习：从手写数字到静态手势](MachineLearning/TransferLearning.ipynb) | 先用本地 MNIST 预训练，再给手势任务换头。在每类 20 张训练图的条件下比较从头训练、冻结特征和微调，用学习曲线、权重变化和测试准确率解释选择。 |
 
 每个笔记本都可以单独学习；线性回归和基础练习适合先学。课中请从上到下逐格运行，遇到问题先作预测、操作演示，再回到代码改变参数或补充实现，并运行紧接着的检查。标为「演示」或「准备」的代码直接运行即可，无需理解或修改 Widget；标为「练习」的代码才是需要关注的算法实现。检查通过只说明满足所给例子，还要观察图形并思考不同输入下的行为。
 
