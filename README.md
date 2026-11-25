@@ -6,7 +6,7 @@
 
 三节深度学习课已在 Python 3.10.15、PyTorch 2.5.1、Apple 芯片 Mac 的 CPU 上完整运行。项目依赖锁定为 `torch==2.5.1`。建议机房使用 64 位 Python 3.10，在项目根目录打开终端。
 
-Win11 有 NVIDIA 显卡的同学和负责配置环境的 AI Agent，请从[全新 CUDA 环境](#win11-全新-cuda-环境)开始。运行 CNN 的同学如果已经遇到内核退出，请先看[已有环境的排查](#win11-已有环境的-mklopenmp-冲突排查)。
+Win11 有 NVIDIA 显卡且首次配置课程环境的同学，可以按[全新 CUDA 环境](#win11-全新-cuda-环境)安装。已有环境的同学可以直接用对应内核运行 CNN，遇到内核退出时优先[在原环境排查和修复](#win11-已有环境的-mklopenmp-冲突排查)。
 
 ### Win11 全新 CUDA 环境
 
@@ -115,19 +115,55 @@ if ($LASTEXITCODE -ne 0) { throw 'CNN notebook validation failed. Check the erro
 
 ### Win11 已有环境的 MKL/OpenMP 冲突排查
 
-1. 在报错的 notebook 中重启内核，先单独运行 `import sys; print(sys.executable)`，记录实际解释器路径。从终端用该解释器启动 JupyterLab（`& '实际的 python.exe 路径' -m jupyterlab --debug`），重新运行到出错单元，查看终端里的原始错误和出错位置。
-2. 如果日志同时出现 `OMP: Error #15` 和 `libiomp5md.dll` 或 `libomp.dll`，说明同一进程加载了冲突的 OpenMP 运行库。常见情形是 Conda 环境中已有使用 MKL 的包，随后又通过 pip 安装了自带 OpenMP 运行库的 PyTorch。CNN 的首张样本图使用 CPU 数据。如果日志只显示 `Kernel died`，请保留退出前的日志和具体单元，继续定位原因。[PyTorch 的 Windows 同类案例](https://github.com/pytorch/pytorch/issues/167979)
-3. 若已有通过验证的干净课程内核，可以直接切换过去。否则保存 notebook，关闭旧 JupyterLab，从普通 PowerShell 按上方全新环境流程配置。将第一段开头的环境路径和内核名称替换为以下示例，确保目录和内核名尚未被占用。再运行第二段验收，打开原项目中的同一个 notebook，选择 **Python (MLwithAI Win11 CUDA Recovery)**。
+#### 确认出错的内核和库
 
-   ```powershell
-   $venvPath = Join-Path $env:LOCALAPPDATA 'MLwithAI\win11-cuda-recovery'
-   $kernelName = 'mlwithai-win11-cuda-recovery'
-   $kernelDisplayName = 'Python (MLwithAI Win11 CUDA Recovery)'
-   ```
+在出错的 notebook 中重启内核，先单独运行 `import sys; print(sys.executable)`。在 PowerShell 激活该解释器对应的 Conda 环境，再运行以下命令。两处 Python 路径应一致。先清除当前终端可能继承的 OpenMP 绕过设置，让原始错误可以正常出现。
 
-4. 统一从官方 PyTorch 源安装 torch，其余依赖从 PyPI 安装。保留各软件包原有的 DLL。若旧环境设置过 `KMP_DUPLICATE_LIB_OK=TRUE`，可照安装命令清除当前进程的设置，再验收新内核。允许重复加载可能造成崩溃或计算错误。[Intel OpenMP 重复加载说明](https://community.intel.com/t5/Intel-oneAPI-Math-Kernel-Library/Windows-libiomp5md-reports-multiple-initialisation/m-p/1361874)
+```powershell
+Remove-Item Env:KMP_DUPLICATE_LIB_OK -ErrorAction SilentlyContinue
+python -c "import sys; print(sys.executable)"
+conda list --show-channel-urls '^(numpy(-base)?|scipy|blas|libblas|mkl([_-].*)?|intel-openmp|llvm-openmp|pytorch(-cuda)?|torch|matplotlib(-base)?)$'
+python -m jupyterlab --debug
+```
 
-课程只切换运行内核，原来的项目目录、数据和 notebook 仍在原处。旧环境及其内核可以继续留给其他项目。若它仅用于本课程，可在新内核验收通过后，确认没有其他项目使用它，再决定是否清理。
+重跑到出错单元。若日志显示 `OMP: Error #15`，并列出 `libiomp5md.dll` 或 `libomp.dll`，可确认是同一进程中的 OpenMP 运行库冲突。Conda 和 pip 可以在一个环境里安装不同的包。一个常见冲突组合是启用 MKL 的 NumPy 与自带 OpenMP 的 PyTorch，实际来源要以包清单和库加载情况为准。如果日志只有 `Kernel died`，保留出错单元和退出前的日志，先继续定位。CNN 首张样本图使用 CPU 数据。[PyTorch 的 Windows 同类案例](https://github.com/pytorch/pytorch/issues/167979)
+
+可以用下面两条命令在**独立进程**中分别检查 NumPy 和 PyTorch。若输出包含 `filepath`，记录 BLAS/OpenMP 库的路径和所用后端。它们显示各自加载的运行库，有助于区分 Conda 的 `Library\bin`、PyTorch 的 `torch\lib` 以及环境外的路径。
+
+```powershell
+python -X faulthandler -u -c "import numpy as n; a=n.ones((128,128)); a@a; from threadpoolctl import threadpool_info; print(threadpool_info())"
+python -X faulthandler -u -c "import torch; a=torch.ones((128,128)); a@a; from threadpoolctl import threadpool_info; print(threadpool_info())"
+```
+
+#### 保留现有 Conda 环境原地修复
+
+如果已确认是这种冲突，而且 NumPy/SciPy 一侧使用 MKL，可以先关闭 JupyterLab，在**同一环境**中做一次可逆测试。oneMKL 如果使用可切换的动态接口，`SEQUENTIAL` 会让它走单线程计算；其他加载 OpenMP 的组件仍需单独检查。此设置仅在本次 JupyterLab 启动期间生效，相关 MKL CPU 计算可能变慢。[Intel oneMKL 线程层说明](https://www.intel.com/content/www/us/en/docs/onemkl/developer-guide-windows/2025-1/call-onemkl-functions-from-multi-threaded-apps.html)
+
+```powershell
+$previousMklLayer = $env:MKL_THREADING_LAYER
+try {
+    $env:MKL_THREADING_LAYER = 'SEQUENTIAL'
+    python -m jupyterlab --debug
+} finally {
+    $env:MKL_THREADING_LAYER = $previousMklLayer
+}
+```
+
+需要在正常启动方式下长期使用时，可在现有环境里让 Conda 把 NumPy/SciPy 的 BLAS 后端切到 OpenBLAS，保留已有的 CUDA 版 PyTorch。先关闭 JupyterLab 和正在使用该环境的 Python 进程。按包清单里 **NumPy/SciPy 所用的渠道**选下面一条预演，并记下当前 Conda 修订号。
+
+```powershell
+conda list --revisions
+
+# NumPy/SciPy 使用 conda-forge，且环境已有 libblas。
+conda install --dry-run "libblas=*=*_openblas"
+
+# NumPy/SciPy 使用 defaults，且环境用 blas 元包选择后端。
+conda install --dry-run "blas=*=openblas"
+```
+
+确认安装计划把相关数值库切到 OpenBLAS，并保留 Python 版本、CUDA PyTorch 和其他项目需要的包，再对选中的命令去掉 `--dry-run` 执行。若求解失败或要大范围更换软件包和渠道，保留原环境和预演输出，继续核对是哪个包加载了第二套 OpenMP。此处的回滚适用于 Conda 的包变更，可用 `conda install --revision N` 恢复到记录的修订号。[conda-forge 的 BLAS 切换说明](https://conda-forge.org/docs/maintainer/knowledge_base/#switching-blas-implementation) · [Anaconda 的 Windows OpenBLAS 包](https://anaconda.org/anaconda/blas/files) · [Conda 修订与回滚](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#restoring-an-environment)
+
+修复后从同一环境重新启动 JupyterLab，选原内核。先确认首张样本图正常显示，再跑完整本 CNN。需要 GPU 的机器同时按下文[启动并验证](#启动并验证)检查 CUDA 卷积与反向传播。保留原有 DLL，由包管理器维护；`KMP_DUPLICATE_LIB_OK=TRUE` 会绕过重复初始化检查，可能导致崩溃或计算错误。[Intel OpenMP 重复加载说明](https://community.intel.com/t5/Intel-oneAPI-Math-Kernel-Library/Windows-libiomp5md-reports-multiple-initialisation/m-p/1361874)
 
 ### 创建课程环境
 
