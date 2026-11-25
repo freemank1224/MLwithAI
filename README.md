@@ -4,23 +4,77 @@
 
 ## 安装与启动
 
-需要 Python 3 和可以安装 Python 软件包的环境。在项目根目录打开终端，建议建立独立环境：
+三节深度学习课已在 Python 3.10.15、PyTorch 2.5.1、Apple 芯片 Mac 的 CPU 上完整运行。项目依赖锁定为 `torch==2.5.1`。建议机房使用 64 位 Python 3.10，在项目根目录打开终端。
+
+### 创建课程环境
+
+macOS 或 Linux：
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate       # macOS / Linux
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
+python3.10 -m venv .venv
+source .venv/bin/activate
+```
+
+Windows PowerShell：
+
+```powershell
+py -3.10 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+已经创建过环境的同学只需激活它。根据要使用的设备，从下面两种安装方式中选一种。
+
+### CPU 安装
+
+Apple 芯片 Mac 可直接运行 `python -m pip install -r requirements.txt`。Windows 或 Linux 的 x86-64 机器可先安装官方 CPU 构建，再补齐课程依赖：
+
+```bash
+python -m pip install torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -r requirements.txt
+```
+
+### NVIDIA 显卡安装（Windows 或 Linux）
+
+在终端运行 `nvidia-smi`，确认系统能列出显卡和驱动版本。根据显卡型号及驱动支持情况选择 PyTorch 2.5.1 的 CUDA 构建。下面以 **CUDA 12.4** 为例；选用 CUDA 12.1 时，将命令中的两处 `cu124` 都换成 `cu121`。选用 CUDA 11.8 时都换成 `cu118`。包名中的构建标记也能让 pip 区分现有的同版本 CPU 安装。[PyTorch 2.5.1 官方安装表](https://pytorch.org/get-started/previous-versions/#v251)
+
+```bash
+python -m pip install torch==2.5.1+cu124 --index-url https://download.pytorch.org/whl/cu124
+python -m pip install -r requirements.txt
+```
+
+### 启动并验证
+
+两种环境使用相同的启动命令。首次安装后注册内核，之后上课只需激活环境并启动 JupyterLab。
+
+```bash
 python -m ipykernel install --user --name mlwithai --display-name "Python (MLwithAI)"
 python -m jupyterlab
 ```
 
-浏览器打开 JupyterLab 后，从左侧文件浏览器进入相应的 `.ipynb`，选择 **Python (MLwithAI)** 内核。下一次打开项目时，先激活同一个虚拟环境，再运行 `python -m jupyterlab`。安装只需一次；若更新了依赖，请重新运行安装命令。
+打开课程 notebook，选择 **Python (MLwithAI)** 内核。下格在所选设备执行一次卷积和反向传播。**CPU 安装保留 `"cpu"`，NVIDIA 安装改为 `"cuda"`**，这样能明确检查本次安装目标。
+
+```python
+import sys
+print("当前内核", sys.executable)
+
+import torch
+target = "cpu"
+print("PyTorch", torch.__version__, "CUDA 构建", torch.version.cuda)
+assert torch.__version__.split("+")[0] == "2.5.1", "请检查课程环境中的 PyTorch 版本"
+if target == "cuda":
+    assert torch.cuda.is_available(), "请检查当前内核、CUDA 构建和 NVIDIA 驱动"
+    print("显卡", torch.cuda.get_device_name(0))
+
+layer = torch.nn.Conv2d(1, 8, 3).to(target)
+output = layer(torch.ones(1, 1, 28, 28, device=target))
+output.mean().backward()
+assert layer.weight.grad.isfinite().all().item()
+print("卷积与反向传播通过", output.device, tuple(output.shape))
+```
+
+CPU 验证应显示 `cpu (1, 8, 26, 26)`，NVIDIA 验证应显示显卡名称和 `cuda:0 (1, 8, 26, 26)`。课程准备单元会自动选择可用的 CUDA 设备，否则使用 CPU。如果遇到 `No module named 'torch'`，核对第一行的内核路径，切回课程内核；若课程环境确实缺包，按上面选定的路线安装一次，重启内核即可。
 
 本课程不依赖联网服务或 API 密钥。原项目可选的 Jupyter AI、XGBoost、LightGBM 和 pandas 不属于运行这些课程的基础依赖；有需要时可在同一环境另行安装，例如 `python -m pip install 'jupyter-ai[all]' xgboost lightgbm pandas`。
-
-深度学习三课另需 PyTorch。CPU 环境可运行 `python -m pip install torch`。使用 NVIDIA 显卡时，请在同一 Python 环境安装与驱动兼容的 CUDA 版 PyTorch。准备单元会显示实际训练设备和显卡名称；当 `torch.cuda.is_available()` 为真时自动使用 CUDA，否则使用 CPU。三课均使用本地数据，可离线训练。[PyTorch 安装选择器](https://pytorch.org/get-started/locally/)
 
 三课训练时每轮刷新训练集和验证集的交叉熵（loss）曲线。训练损失按该轮实际送入模型的样本求平均。课程最后用各轮权重回算原始测试集的损失，将训练和测试 loss 分图展示，共用纵轴刻度。模型选择依据验证集，测试曲线用于最终复盘。
 
