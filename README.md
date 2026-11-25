@@ -6,6 +6,118 @@
 
 三节深度学习课已在 Python 3.10.15、PyTorch 2.5.1、Apple 芯片 Mac 的 CPU 上完整运行。项目依赖锁定为 `torch==2.5.1`。建议机房使用 64 位 Python 3.10，在项目根目录打开终端。
 
+Win11 有 NVIDIA 显卡的同学和负责配置环境的 AI Agent，请从[全新 CUDA 环境](#win11-全新-cuda-环境)开始。运行 CNN 的同学如果已经遇到内核退出，请先看[已有环境的排查](#win11-已有环境的-mklopenmp-冲突排查)。
+
+### Win11 全新 CUDA 环境
+
+以下命令适用于 Win11 x64 和 NVIDIA 显卡。在刚克隆的项目根目录打开普通 PowerShell。如果提示符有 `(base)` 或其他 Conda 环境名，先运行 `conda deactivate`，直到退出 Conda 环境。需要独立安装的 x64 CPython 3.10 和可运行的 NVIDIA 驱动。如果缺少 Python，可安装官方页面的 **Windows installer (64-bit)** 并勾选 Python Launcher，安装后重新打开 PowerShell。可用 `py -0p` 查看解释器路径。[Python 3.10 Windows 安装包](https://www.python.org/downloads/release/python-31011/)
+
+在同一个 PowerShell 窗口依次运行下面两段。第一段按驱动公布的 CUDA 版本选择 PyTorch 2.5.1 的官方构建，在独立 `.venv` 中安装依赖并注册专用内核。最终能否用该构建在显卡上训练，以第二段的实跑结果为准。[PyTorch 2.5.1 官方安装表](https://pytorch.org/get-started/previous-versions/#v251)
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$venvPath = '.venv'
+$kernelName = 'mlwithai-win11-cuda'
+
+if ($env:CONDA_PREFIX) { throw 'Exit the Conda environment before continuing.' }
+if (!(Test-Path 'requirements.txt') -or !(Test-Path 'MachineLearning\CNNImageRecognition.ipynb')) {
+    throw 'Run these commands from the MLwithAI project root.'
+}
+if (Test-Path $venvPath) { throw "Choose a new environment path: $venvPath already exists." }
+
+$basePython = py -3.10 -I -c "import sys; print(sys.executable)"
+if ($LASTEXITCODE -ne 0) { throw 'Install standalone x64 CPython 3.10 first.' }
+& $basePython -I -c "import platform, sys; assert sys.version_info[:2] == (3, 10) and platform.machine().upper() == 'AMD64' and sys.maxsize > 2**32 and sys.prefix == sys.base_prefix; print(sys.executable, sys.version)"
+if ($LASTEXITCODE -ne 0 -or (Test-Path (Join-Path (Split-Path -Parent $basePython) 'conda-meta'))) {
+    throw 'Use a standalone x64 CPython 3.10 installation.'
+}
+
+$gpuInfo = nvidia-smi
+if ($LASTEXITCODE -ne 0) { throw 'nvidia-smi failed. Check the NVIDIA driver.' }
+$gpuInfo
+$cudaMatch = [regex]::Match(($gpuInfo -join "`n"), 'CUDA Version:\s*(\d+\.\d+)')
+if (!$cudaMatch.Success) { throw 'Could not read CUDA Version from nvidia-smi.' }
+$driverCuda = [version]$cudaMatch.Groups[1].Value
+if ($driverCuda -ge [version]'12.4') {
+    $cudaBuild = 'cu124'
+} elseif ($driverCuda -ge [version]'12.1') {
+    $cudaBuild = 'cu121'
+} elseif ($driverCuda -ge [version]'11.8') {
+    $cudaBuild = 'cu118'
+} else {
+    throw 'Check driver compatibility with the CUDA builds for PyTorch 2.5.1.'
+}
+
+# 清除当前 PowerShell 进程继承的 Python 路径和 OpenMP 绕过设置。
+Remove-Item Env:PYTHONHOME, Env:PYTHONPATH, Env:KMP_DUPLICATE_LIB_OK -ErrorAction SilentlyContinue
+& $basePython -I -m venv $venvPath
+if ($LASTEXITCODE -ne 0) { throw 'Could not create the course environment.' }
+$coursePython = (Resolve-Path (Join-Path $venvPath 'Scripts\python.exe')).Path
+
+function Invoke-CoursePython {
+    & $coursePython -I @args
+    if ($LASTEXITCODE -ne 0) { throw "Course Python exited with code $LASTEXITCODE." }
+}
+
+Invoke-CoursePython -m pip --isolated install --index-url "https://download.pytorch.org/whl/$cudaBuild" "torch==2.5.1+${cudaBuild}"
+Invoke-CoursePython -m pip --isolated install --index-url https://pypi.org/simple '--only-binary=numpy,scipy,matplotlib' -r requirements.txt
+Invoke-CoursePython -m pip check
+Invoke-CoursePython -m ipykernel install --user --name $kernelName --display-name "Python (MLwithAI Win11 CUDA)"
+```
+
+第二段通过刚注册的内核执行整本 CNN notebook，包含第一次样本绘图和 GPU 训练。终端需要输出课程解释器路径、CUDA 版 PyTorch、显卡名称、`cuda:0` 和样本图检查结果。AI Agent 可直接在终端验收，执行结果保存在内存中。
+
+```powershell
+@'
+from pathlib import Path
+import sys
+
+import nbformat
+from nbclient import NotebookClient
+
+kernel_name, cuda_build = sys.argv[1:]
+expected_torch = "2.5.1+" + cuda_build
+path = Path("MachineLearning/CNNImageRecognition.ipynb").resolve()
+notebook = nbformat.read(path, as_version=4)
+notebook.cells.append(nbformat.v4.new_code_cell(f"""
+from pathlib import Path
+import sys
+
+assert Path(sys.executable).resolve() == Path({sys.executable!r}).resolve(), "Wrong Jupyter kernel"
+assert torch.__version__ == {expected_torch!r}, torch.__version__
+assert torch.cuda.is_available() and device.type == "cuda", "CUDA training is unavailable"
+model, _ = runs["MNIST", "CNN"]
+actual_device = next(model.parameters()).device
+assert str(actual_device) == "cuda:0", actual_device
+print("Kernel:", sys.executable)
+print("PyTorch:", torch.__version__, "CUDA:", torch.version.cuda)
+print("GPU:", torch.cuda.get_device_name(actual_device), actual_device)
+"""))
+NotebookClient(
+    notebook, kernel_name=kernel_name, timeout=300,
+    resources={"metadata": {"path": str(path.parent)}},
+).execute()
+first_image = next(cell for cell in notebook.cells if "ax.imshow(img," in cell.source)
+assert any("image/png" in item.get("data", {}) for item in first_image.outputs), "First plot is missing"
+for item in notebook.cells[-1].outputs:
+    if item.output_type == "stream":
+        print(item.text, end="")
+print("CNN notebook completed. First sample plot rendered.")
+'@ | & $coursePython -I - $kernelName $cudaBuild
+if ($LASTEXITCODE -ne 0) { throw 'CNN notebook validation failed. Check the error above.' }
+```
+
+开始上课时，在同一窗口运行 `& $coursePython -I -m jupyterlab`，打开 notebook 后选择 **Python (MLwithAI Win11 CUDA)**。以后可在项目根目录运行 `& .\.venv\Scripts\python.exe -I -m jupyterlab`。如使用其他虚拟环境路径，请用那个环境的解释器启动。
+
+如果验收时报 `CUDA training is unavailable` 或 `no kernel image is available`，保留显卡型号、驱动版本和完整错误，检查这块显卡是否受所用构建支持。需要先上课时，可用下文的 CPU 路线另建环境。
+
+### Win11 已有环境的 MKL/OpenMP 冲突排查
+
+1. 在报错的 notebook 中重启内核，先单独运行 `import sys; print(sys.executable)`，记录实际解释器路径。从终端用该解释器启动 JupyterLab（`& '实际的 python.exe 路径' -m jupyterlab --debug`），重新运行到出错单元，查看终端里的原始错误和出错位置。
+2. 如果日志同时出现 `OMP: Error #15` 和 `libiomp5md.dll` 或 `libomp.dll`，说明同一进程加载了冲突的 OpenMP 运行库。常见情形是 Conda 环境中已有使用 MKL 的包，随后又通过 pip 安装了自带 OpenMP 运行库的 PyTorch。CNN 的首张样本图使用 CPU 数据。如果日志只显示 `Kernel died`，请保留退出前的日志和具体单元，继续定位原因。[PyTorch 的 Windows 同类案例](https://github.com/pytorch/pytorch/issues/167979)
+3. 若已装好干净的课程环境，先切换到它注册的内核再验证。否则关闭旧 JupyterLab，从普通 PowerShell 按上方全新环境流程重建并验证。若项目已有 `.venv`，把第一段的 `$venvPath` 改为一个尚未使用的路径，例如 `Join-Path $env:LOCALAPPDATA 'MLwithAI\win11-cuda'`，保留原环境。打开课程时选 **Python (MLwithAI Win11 CUDA)**，用 `sys.executable` 确认已切换。
+4. 统一从官方 PyTorch 源安装 torch，其余依赖从 PyPI 安装。保留各软件包原有的 DLL。若旧环境设置过 `KMP_DUPLICATE_LIB_OK=TRUE`，可照安装命令清除当前进程的设置，再验收新内核。允许重复加载可能造成崩溃或计算错误。[Intel OpenMP 重复加载说明](https://community.intel.com/t5/Intel-oneAPI-Math-Kernel-Library/Windows-libiomp5md-reports-multiple-initialisation/m-p/1361874)
+
 ### 创建课程环境
 
 macOS 或 Linux：
@@ -15,7 +127,7 @@ python3.10 -m venv .venv
 source .venv/bin/activate
 ```
 
-Windows PowerShell：
+Windows CPU 环境（PowerShell）：
 
 ```powershell
 py -3.10 -m venv .venv
@@ -33,7 +145,7 @@ python -m pip install torch==2.5.1+cpu --index-url https://download.pytorch.org/
 python -m pip install -r requirements.txt
 ```
 
-### NVIDIA 显卡安装（Windows 或 Linux）
+### NVIDIA 显卡安装（Linux）
 
 在终端运行 `nvidia-smi`，确认系统能列出显卡和驱动版本。根据显卡型号及驱动支持情况选择 PyTorch 2.5.1 的 CUDA 构建。下面以 **CUDA 12.4** 为例；选用 CUDA 12.1 时，将命令中的两处 `cu124` 都换成 `cu121`。选用 CUDA 11.8 时都换成 `cu118`。包名中的构建标记也能让 pip 区分现有的同版本 CPU 安装。[PyTorch 2.5.1 官方安装表](https://pytorch.org/get-started/previous-versions/#v251)
 
